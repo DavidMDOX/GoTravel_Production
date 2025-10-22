@@ -1,6 +1,6 @@
 function $(id){ return document.getElementById(id); }
 const state = { hasDest:'no', wish:'', intl:'不限', from:'', days:5, prefs:[], transport:'公共交通', driveMax:3, budget:'', notes:'' };
-const MODEL='gpt-4o-mini', TEMP=0.7;
+const MODEL='gpt-4o', TEMP=0.7;
 const PREF_OPTIONS=['徒步','历史','带宠物','带娃','海边','自然','美食','博物馆','城市漫步','小众'];
 
 function initUI(){
@@ -19,30 +19,9 @@ function initUI(){
 }
 function setStep(n){ for(let i=1;i<=4;i++){ $('step'+i).style.display=(i===n?'block':'none'); $('s'+i).classList.toggle('active',i===n); $('s'+i).classList.toggle('done',i<n);} }
 function buildJSONPrompt(){ return { role:'user', content:
-`你是资深旅行规划师。请**只输出 JSON**（不要任何额外文字），结构为：
-{
-  "overview": {
-    "summary": "总体介绍，100字内",
-    "budget": { "currency": "GBP/CNY/USD 等", "trip_total": {"min": 数字, "max": 数字},
-                "accommodation_per_night": {"min": 数字, "max": 数字},
-                "food_per_day": {"min": 数字, "max": 数字},
-                "transport_total": {"min": 数字, "max": 数字},
-                "activities_total": {"min": 数字, "max": 数字} }
-  },
-  "days": [
-    { "title": "Day 1 - 城市名 / 主题",
-      "morning": ["安排1","安排2"],
-      "afternoon": ["安排1","安排2"],
-      "evening": ["安排1","安排2"],
-      "transport": "当日交通说明（步行/地铁/自驾；时间）",
-      "budget": { "currency": "同上", "min": 数字, "max": 数字 },
-      "notes": ["需预约","开放时间","备用方案"],
-      "pois": [ { "name":"POI 名称", "type":"museum/restaurant/hotel/...","address":"地址" } ]
-    }
-  ],
-  "links": { "official_sites": ["https://..."] }
-}
-请基于这些用户输入生成：
+`你是资深旅行规划师。请**严格使用 JSON 模式**输出（不要任何额外文字/注释/代码块）。结构为：
+{"overview":{"summary":"100字内","budget":{"currency":"GBP/CNY/USD","trip_total":{"min":数,"max":数},"accommodation_per_night":{"min":数,"max":数},"food_per_day":{"min":数,"max":数},"transport_total":{"min":数,"max":数},"activities_total":{"min":数,"max":数}}},"days":[{"title":"Day 1 - 城市名 / 主题","morning":["安排1","安排2"],"afternoon":["安排1","安排2"],"evening":["安排1","安排2"],"transport":"步行/地铁/自驾；时间","budget":{"currency":"同上","min":数,"max":数},"notes":["需预约","开放时间","备用方案"],"pois":[{"name":"POI 名称","type":"museum/restaurant/hotel/...","address":"地址"}]}],"links":{"official_sites":["https://..."]}}
+基于用户输入：
 - 是否已有目的地: ${state.hasDest==='yes'?'是':'否'}
 - 想去: ${state.wish||'未指定'}
 - 出不出境: ${state.intl}
@@ -52,10 +31,10 @@ function buildJSONPrompt(){ return { role:'user', content:
 - 出行方式: ${state.transport}${state.transport==='自驾'?'（每天最多驾驶'+state.driveMax+'小时）':''}
 - 人均预算: ${($('budget').value||'未指定')}
 - 其他要求: ${($('notes').value||'无')}
-严格要求：1) 仅输出 JSON；字段名与上面一致；货币统一；数字用阿拉伯数字。2) 每日安排条理清晰，适合直接渲染为卡片。3) 不要输出外部 URL，除了 links.official_sites 最多 3 个官网。` }; }
+**务必：**仅输出 JSON；字段名必须与给定结构一致；货币符号统一；数字使用阿拉伯数字。` }; }
 async function startGeneration(){
   state.budget=$('budget').value.trim(); state.notes=$('notes').value.trim();
-  $('status').textContent='正在生成（流式）…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent='';
+  $('status').textContent='正在生成（流式 JSON 模式）…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent='';
   ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=true);
   const resp=await fetch('/api/openai-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:MODEL,temperature:TEMP,messages:[{role:'system',content:'你是专业旅行规划师，仅输出有效 JSON（无额外文字）。'},buildJSONPrompt()]})});
   if(!resp.ok){ $('status').textContent='生成失败：'+resp.status; return; }

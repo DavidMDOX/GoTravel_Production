@@ -7,7 +7,7 @@ export default async function handler(req) {
   const r = await fetch("https://api.openai.com/v1/chat/completions", {
     method:"POST",
     headers:{ "Authorization":`Bearer ${apiKey}`, "Content-Type":"application/json" },
-    body: JSON.stringify({ ...body, stream:true })
+    body: JSON.stringify({ ...body, stream:true, response_format: { type: "json_object" } })
   });
   return new Response(r.body, { headers:{
     "Content-Type":"text/event-stream; charset=utf-8",
