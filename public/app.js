@@ -1,6 +1,6 @@
 function $(id){ return document.getElementById(id); }
 const state = { hasDest:'no', wish:'', intl:'不限', from:'', days:5, prefs:[], transport:'公共交通', driveMax:3, budget:'', notes:'' };
-const MODEL='gpt-4o', TEMP=0.4;
+const MODEL='gpt-4o'; const TEMP=0.4;
 const PREF_OPTIONS=['徒步','历史','带宠物','带娃','海边','自然','美食','博物馆','城市漫步','小众'];
 
 function initUI(){
@@ -32,25 +32,46 @@ function setStep(n){ for(let i=1;i<=4;i++){ $('step'+i).style.display=(i===n?'bl
 
 async function startGeneration(){
   state.budget=$('budget').value.trim(); state.notes=$('notes').value.trim();
-  $('status').textContent='正在生成（稳定 JSON 模式）…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent=''; ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=true);
+  $('status').textContent='正在生成…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent='';
+  ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=true);
+
   const sys={role:'system',content:'你是专业旅行规划师。严格返回函数参数 JSON，不要输出任何解释。'};
   const user={role:'user',content:buildUserPrompt()};
-  const resp=await fetch('/api/plan-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:MODEL,temperature:TEMP,messages:[sys,user]})});
-  if(!resp.ok){ $('status').textContent='生成失败：'+resp.status; return; }
-  const reader=resp.body.getReader(); const decoder=new TextDecoder(); let buf='', args='';
-  while(true){ const {value,done}=await reader.read(); if(done)break; buf+=decoder.decode(value,{stream:true}); const parts=buf.split('\\n\\n'); buf=parts.pop();
-    for(const p of parts){ if(!p.startsWith('data:')) continue; const data=p.slice(5).trim(); if(data==='[DONE]') break;
-      try{ const j=JSON.parse(data); const delta=j.choices?.[0]?.delta; const tc=delta?.tool_calls?.[0]; if(tc?.function?.arguments){ args+=tc.function.arguments; $('status').textContent='已接收 '+args.length+' 字符…'; } }catch(e){} } }
-  $('progBox').style.display='none';
-  let plan=null; try{ plan=JSON.parse(args); }catch(e){ try{ const s=args.indexOf('{'); const e2=args.lastIndexOf('}'); plan=JSON.parse(args.slice(s,e2+1)); }catch(_){ } }
-  if(!plan){ $('status').textContent='解析失败，请重试。'; $('raw').textContent=args||'(空)'; return; }
-  $('raw').textContent=JSON.stringify(plan,null,2); renderWidgets(plan); $('status').textContent='生成完成 ✅';
-  ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=false);
-  $('copyBtn').onclick=()=>{ navigator.clipboard.writeText(JSON.stringify(plan,null,2)).then(()=>$('status').textContent='已复制 JSON'); };
-  $('saveBtn').onclick=()=>{ const saves=JSON.parse(localStorage.getItem('gt_saves')||'[]'); saves.push({id:Date.now(),meta:{wish:state.wish,days:state.days,from:state.from},content:plan}); localStorage.setItem('gt_saves',JSON.stringify(saves)); $('status').textContent='已保存到本地（浏览器）'; };
-  $('dlJsonBtn').onclick=()=>download('application/json','plan.json',JSON.stringify(plan,null,2));
-  $('dlHtmlBtn').onclick=()=>download('text/html;charset=utf-8','plan.html',exportHTML(plan));
+
+  try{
+    const resp=await fetch('/api/plan-stream',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:MODEL,temperature:TMP_CLAMP(TEMP),messages:[sys,user],stream:false})
+    });
+    if(!resp.ok){
+      $('status').textContent='生成失败：'+resp.status;
+      $('progBox').style.display='none';
+      return;
+    }
+    const plan=await resp.json();
+    if(!plan || typeof plan!=='object'){
+      $('status').textContent='解析失败：返回为空';
+      $('progBox').style.display='none';
+      return;
+    }
+    $('raw').textContent=JSON.stringify(plan,null,2);
+    renderWidgets(plan);
+    $('status').textContent='生成完成 ✅';
+    ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=false);
+    $('copyBtn').onclick=()=>{ navigator.clipboard.writeText(JSON.stringify(plan,null,2)).then(()=>$('status').textContent='已复制 JSON'); };
+    $('saveBtn').onclick=()=>{ const saves=JSON.parse(localStorage.getItem('gt_saves')||'[]'); saves.push({id:Date.now(),meta:{wish:state.wish,days:state.days,from:state.from},content:plan}); localStorage.setItem('gt_saves',JSON.stringify(saves)); $('status').textContent='已保存到本地（浏览器）'; };
+    $('dlJsonBtn').onclick=()=>download('application/json','plan.json',JSON.stringify(plan,null,2));
+    $('dlHtmlBtn').onclick=()=>download('text/html;charset=utf-8','plan.html',exportHTML(plan));
+  }catch(err){
+    console.error(err);
+    $('status').textContent='请求异常：'+(err&&err.message||'网络错误');
+  }finally{
+    $('progBox').style.display='none';
+  }
 }
+
+function TMP_CLAMP(t){ if(typeof t!=='number') return 0.4; return Math.min(1,Math.max(0,t)); }
 
 function buildUserPrompt(){
   return `输入：
@@ -61,8 +82,8 @@ function buildUserPrompt(){
 - 天数: ${state.days}
 - 偏好: ${state.prefs.join('、')||'未指定'}
 - 出行方式: ${state.transport}${state.transport==='自驾'?'（每天最多驾驶'+state.driveMax+'小时）':''}
-- 人均预算: ${($('budget').value||'未指定')}
-- 其他要求: ${($('notes').value||'无')}
+- 人均预算: ${state.budget||'未指定'}
+- 其他要求: ${state.notes||'无'}
 
 请返回一次完整行程（概览 + 每日）。`;
 }
@@ -95,5 +116,5 @@ function notes(n){ if(!n||!n.length) return ''; return `<div><b>备注</b><ul>${
 function fmtRange(cur,seg){ if(!seg) return '-'; const {min,max}=seg; if(min==null&&max==null) return '-'; if(min==null) return `${cur||''} ~${max}`; if(max==null) return `${cur||''} ${min}~`; return `${cur||''} ${min}–${max}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function download(type,name,content){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url); }
-function exportHTML(plan){ const head='<!doctype html><html><meta charset=\"utf-8\"><title>Go Travel</title><style>body{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto;background:#f8fafc;color:#0f172a}.itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px}@media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }.day{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)}.day h3{margin:0 0 8px}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1;font-size:12px;margin-right:6px}</style><body><div class=\"itinerary\" id=\"it\"></div><script>'; const tail='</script></body></html>'; const js=`var plan=${'${JSON.stringify(plan)}'};function h(t){return t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}function r(title,arr){if(!arr||!arr.length)return '';return '<div><b>'+title+'</b><ul>'+arr.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>';}function fr(cur,seg){if(!seg)return '-';var mn=seg.min,mx=seg.max;if(mn==null&&mx==null)return '-';if(mn==null)return (cur||'')+' ~'+mx; if(mx==null)return (cur||'')+' '+mn+'~'; return (cur||'')+' '+mn+'–'+mx;}var it=document.getElementById('it');var ov=plan.overview||{}, b=ov.budget||{}, cur=b.currency||'';var o=document.createElement('div'); o.className='day'; o.innerHTML='<h3>行程概览</h3>' + '<div class=\"pill\">总计：'+fr(cur,b.trip_total)+'</div>' + '<div class=\"pill\">住宿/晚：'+fr(cur,b.accommodation_per_night)+'</div>' + '<div class=\"pill\">餐饮/日：'+fr(cur,b.food_per_day)+'</div>' + '<div class=\"pill\">交通总计：'+fr(cur,b.transport_total)+'</div>' + '<div class=\"pill\">活动总计：'+fr(cur,b.activities_total)+'</div>' + '<div style=\"margin-top:8px\">'+h(ov.summary||'')+'</div>'; it.appendChild(o); (plan.days||[]).forEach(function(d){ var c=document.createElement('div'); c.className='day'; c.innerHTML='<h3>'+h(d.title||'Day')+'</h3>'+r('上午',d.morning)+r('下午',d.afternoon)+r('晚上',d.evening) + '<div class=\"pill\">交通：'+h(d.transport||'')+'</div>' + '<div class=\"pill\">当日预算：'+fr((d.budget||{}).currency,d.budget)+'</div>' + (d.pois&&d.pois.length?('<div><b>POI</b><ul>'+d.pois.map(p=>'<li>'+h(p.name||'')+'（'+h(p.type||'')+'） · '+h(p.address||'')+'</li>').join('')+'</ul></div>'):'') + (d.notes&&d.notes.length?('<div><b>备注</b><ul>'+d.notes.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>'):''); it.appendChild(c); });`; return head+js+tail; }
+function exportHTML(plan){ const head='<!doctype html><html><meta charset="utf-8"><title>Go Travel</title><style>body{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto;background:#f8fafc;color:#0f172a}.itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px}@media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }.day{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)}.day h3{margin:0 0 8px}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1;font-size:12px;margin-right:6px}</style><body><div class="itinerary" id="it"></div><script>'; const tail='</script></body></html>'; const js=`var plan=${'${JSON.stringify(plan)}'};function h(t){return t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}function r(title,arr){if(!arr||!arr.length)return '';return '<div><b>'+title+'</b><ul>'+arr.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>';}function fr(cur,seg){if(!seg)return '-';var mn=seg.min,mx=seg.max;if(mn==null&&mx==null)return '-';if(mn==null)return (cur||'')+' ~'+mx; if(mx==null)return (cur||'')+' '+mn+'~'; return (cur||'')+' '+mn+'–'+mx;}var it=document.getElementById('it');var ov=plan.overview||{}, b=ov.budget||{}, cur=b.currency||'';var o=document.createElement('div'); o.className='day'; o.innerHTML='<h3>行程概览</h3>' + '<div class="pill">总计：'+fr(cur,b.trip_total)+'</div>' + '<div class="pill">住宿/晚：'+fr(cur,b.accommodation_per_night)+'</div>' + '<div class="pill">餐饮/日：'+fr(cur,b.food_per_day)+'</div>' + '<div class="pill">交通总计：'+fr(cur,b.transport_total)+'</div>' + '<div class="pill">活动总计：'+fr(cur,b.activities_total)+'</div>' + '<div style="margin-top:8px">'+h(ov.summary||'')+'</div>'; it.appendChild(o); (plan.days||[]).forEach(function(d){ var c=document.createElement('div'); c.className='day'; c.innerHTML='<h3>'+h(d.title||'Day')+'</h3>'+r('上午',d.morning)+r('下午',d.afternoon)+r('晚上',d.evening) + '<div class="pill">交通：'+h(d.transport||'')+'</div>' + '<div class="pill">当日预算：'+fr((d.budget||{}).currency,d.budget)+'</div>' + (d.pois&&d.pois.length?('<div><b>POI</b><ul>'+d.pois.map(p=>'<li>'+h(p.name||'')+'（'+h(p.type||'')+'） · '+h(p.address||'')+'</li>').join('')+'</ul></div>'):'') + (d.notes&&d.notes.length?('<div><b>备注</b><ul>'+d.notes.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>'):''); it.appendChild(c); });`; return head+js+tail; }
 window.addEventListener('DOMContentLoaded', initUI);
