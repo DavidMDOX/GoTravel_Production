@@ -1,12 +1,10 @@
 {
-  "name": "Go Travel · 带你说走就走",
-  "short_name": "Go Travel",
-  "id": "/",
+  "name": "GoTravel",
+  "short_name": "GoTravel",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0ea5e9",
+  "theme_color": "#111827",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -15,17 +13,6 @@
     },
     {
       "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/apple-touch-icon-180.png",
-      "sizes": "180x180",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/og-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
