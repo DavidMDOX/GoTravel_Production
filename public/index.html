@@ -11,45 +11,173 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
   <style>
-    :root{--brand:#0ea5e9;--ink:#0f172a;--muted:#64748b;--bg:#f8fafc;--card:#fff;--ok:#10b981}
-    *{box-sizing:border-box} html,body{margin:0;padding:0}
-    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto;background:#f8fafc;color:#0f172a}
-    .wrap{max-width:1040px;margin:24px auto;padding:0 16px}
-    .hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:#e0f2fe;border:1px solid #bae6fd;border-radius:16px}
-    .brand{display:flex;align-items:center;gap:10px}
-    .logo{width:32px;height:32px;border-radius:8px;background:url('/icons/icon-192.png') center/cover no-repeat;display:inline-block}
-    .title{font-weight:800;color:#075985}
-    .tag{font-size:12px;color:#0ea5e9;background:#e0f2fe;border:1px solid #bae6fd;border-radius:999px;padding:4px 8px}
-    .stepper{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid #cfe8fb;background:#fff;color:#075985;font-size:12px}
-    .chip.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
-    .chip.done{background:#10b981;color:#fff;border-color:#10b981}
-    .card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.05);margin-top:12px}
-    label{font-size:12px;color:#64748b;display:block;margin-bottom:6px}
-    input,textarea,select{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#fff}
-    textarea{min-height:92px;resize:vertical}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .btn{background:#0ea5e9;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
-    .btn.secondary{background:#e2e8f0;color:#0f172a}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    .itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    @media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }
-    .day{background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)}
-    .day h3{margin:0 0 8px}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1;font-size:12px;margin-right:6px}
-    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
-    .progress{border:1px dashed #bae6fd;background:#f0f9ff;border-radius:12px;padding:10px;margin-top:10px;color:#075985}
-    .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-    .chip-btn{padding:10px 12px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;text-align:center;cursor:pointer}
-    .chip-btn.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
-    #installBtn{position:fixed;right:16px;bottom:16px;z-index:9999;padding:10px 14px;border:0;border-radius:12px;background:#0ea5e9;color:#fff;font-weight:700;box-shadow:0 4px 10px rgba(0,0,0,.15);}
-    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:10000}
-    .modal.show{display:flex}
-    .dialog{background:#fff;border-radius:14px;max-width:520px;width:90%;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-    .dialog h3{margin:0 0 8px}
-  </style>
+  /* —— 设计思路 —— 
+     1) 全局用 clamp() 自适应字号，随视口宽度平滑变化。
+     2) 建立语义字号层级，组件用变量，不直接写px。
+     3) 行高、间距与字号联动，保证移动端可读与可点。 */
+
+  :root{
+    /* 颜色 */
+    --brand:#0ea5e9; --ink:#0f172a; --muted:#64748b; --bg:#f8fafc; --card:#fff; --ok:#10b981;
+
+    /* 基础字体尺寸：在 360px~1440px 间从14px缓慢增到16.5px */
+    --fz-base: clamp(14px, 1rem + 0.2vw, 16.5px);
+
+    /* 层级（相对 base 放大/缩小） */
+    --fz-xs:   clamp(11px, calc(var(--fz-base)*0.78), 13px);
+    --fz-sm:   clamp(12px, calc(var(--fz-base)*0.88), 14px);
+    --fz-md:   var(--fz-base);
+    --fz-lg:   clamp(16px, calc(var(--fz-base)*1.15), 19px);
+    --fz-xl:   clamp(18px, calc(var(--fz-base)*1.35), 22px);
+    --fz-2xl:  clamp(20px, calc(var(--fz-base)*1.55), 26px);
+
+    /* 行高（根据字号层级微调） */
+    --lh-tight: 1.15;
+    --lh-normal: 1.4;
+    --lh-relaxed: 1.55;
+
+    /* 控件高度/圆角（移动端更高方便触控） */
+    --ctl-h: clamp(40px, 8vh, 46px);
+    --radius-12: 12px;
+    --radius-14: 14px;
+    --radius-16: 16px;
+    --radius-20: 20px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans CJK SC",sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: var(--fz-base);
+    line-height: var(--lh-normal);
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  .wrap{max-width:1040px;margin:24px auto;padding:0 16px}
+
+  /* 顶部条 */
+  .hero{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:14px 16px;background:#e0f2fe;border:1px solid #bae6fd;border-radius:var(--radius-16)
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:32px;height:32px;border-radius:8px;background:url('/icons/icon-192.png') center/cover no-repeat;display:inline-block}
+  .title{font-weight:800;color:#075985;font-size:var(--fz-xl);line-height:var(--lh-tight)}
+  .tag{
+    font-size:var(--fz-xs);color:var(--brand);background:#e0f2fe;border:1px solid #bae6fd;
+    border-radius:999px;padding:4px 10px
+  }
+
+  /* 步骤条 */
+  .stepper{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+  .chip{
+    padding:6px 10px;border-radius:999px;border:1px solid #cfe8fb;background:#fff;color:#075985;
+    font-size:var(--fz-sm);line-height:var(--lh-tight)
+  }
+  .chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .chip.done{background:var(--ok);color:#fff;border-color:var(--ok)}
+
+  /* 卡片通用 */
+  .card{
+    background:#fff;border:1px solid #e2e8f0;border-radius:var(--radius-16);padding:16px;
+    box-shadow:0 6px 18px rgba(0,0,0,.05);margin-top:12px
+  }
+
+  /* 表单 */
+  label{font-size:var(--fz-xs);color:var(--muted);display:block;margin-bottom:6px}
+  input,textarea,select{
+    width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:var(--radius-12);background:#fff;
+    font-size:var(--fz-md);line-height:var(--lh-normal);height:var(--ctl-h)
+  }
+  textarea{min-height:calc(var(--ctl-h)*2.2);resize:vertical;height:auto}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
+
+  /* 按钮 */
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .btn{
+    background:var(--brand);color:#fff;border:0;border-radius:var(--radius-12);
+    padding:0 16px;font-weight:700;cursor:pointer;height:var(--ctl-h);
+    font-size:var(--fz-md);line-height:var(--lh-tight)
+  }
+  .btn.secondary{background:#e2e8f0;color:var(--ink)}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+
+  /* 行程卡片 */
+  .itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }
+  .day{
+    background:#ffffff;border:1px solid #e5e7eb;border-radius:var(--radius-14);
+    padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)
+  }
+  .day h3{margin:0 0 8px;font-size:var(--fz-lg);line-height:var(--lh-tight)}
+
+  /* 标签/药丸 */
+  .pill{
+    display:inline-block;padding:3px 10px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;
+    color:#0369a1;font-size:var(--fz-xs);line-height:var(--lh-tight);margin-right:6px
+  }
+
+  /* 工具栏 */
+  .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+
+  /* 进度条/提示 */
+  .progress{
+    border:1px dashed #bae6fd;background:#f0f9ff;border-radius:var(--radius-12);
+    padding:10px;margin-top:10px;color:#075985;font-size:var(--fz-sm)
+  }
+
+  /* 偏好选项（点击块） */
+  .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .chip-btn{
+    padding:10px 12px;border-radius:var(--radius-12);border:1px solid #cbd5e1;background:#fff;text-align:center;cursor:pointer;
+    font-size:var(--fz-md);line-height:var(--lh-tight);min-height:calc(var(--ctl-h)*0.8)
+  }
+  .chip-btn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+  /* 安装按钮与弹窗 */
+  #installBtn{
+    position:fixed;right:16px;bottom:16px;z-index:9999;padding:10px 14px;border:0;border-radius:var(--radius-12);
+    background:var(--brand);color:#fff;font-weight:700;box-shadow:0 4px 10px rgba(0,0,0,.15);
+    font-size:var(--fz-sm);height:auto
+  }
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:10000}
+  .modal.show{display:flex}
+  .dialog{
+    background:#fff;border-radius:var(--radius-14);max-width:520px;width:90%;padding:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.2);font-size:var(--fz-md)
+  }
+  .dialog h3{margin:0 0 8px;font-size:var(--fz-lg)}
+
+  /* 列表/正文微调 */
+  ul{padding-left:18px;margin:6px 0}
+  li{margin:4px 0}
+  b{font-weight:700}
+
+  /* 桌面增强（>1200px 时适度放大标题/按钮） */
+  @media (min-width:1200px){
+    .title{font-size:var(--fz-2xl)}
+    .day h3{font-size:var(--fz-xl)}
+    .btn{font-size:calc(var(--fz-md)*1.02)}
+  }
+
+  /* 小屏（<=390px）进一步压缩非关键信息 */
+  @media (max-width:390px){
+    .tag,.pill,label{font-size:var(--fz-xs)}
+    .chip{font-size:var(--fz-xs)}
+    .chip-btn{font-size:var(--fz-sm)}
+  }
+
+  /* 减少动画用户 */
+  @media (prefers-reduced-motion: reduce){
+    *{scroll-behavior:auto}
+  }
+</style>
+  
 </head>
 <body>
   <div class="wrap">
