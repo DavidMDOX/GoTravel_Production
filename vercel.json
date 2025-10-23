@@ -1,17 +1,16 @@
 {
-  "headers": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        }
-      ]
+      "src": "^/$",
+      "dest": "/index.html"
+    },
+    {
+      "src": "^/index.html$",
+      "dest": "/index.html"
+    },
+    {
+      "src": "^/api/plan-stream$",
+      "dest": "/api/plan-stream.js"
     }
   ]
 }
