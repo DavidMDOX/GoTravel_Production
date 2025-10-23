@@ -35,7 +35,7 @@ async function startGeneration(){
   $('status').textContent='正在生成…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent='';
   ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=true);
 
-  const sys={role:'system',content:'你是专业旅行规划师。严格返回函数参数 JSON，不要输出任何解释。尽量补充 POI 的 address 与 url、门票与时长建议。'};
+  const sys={role:'system',content:'你是专业旅行规划师。严格返回函数参数 JSON，不要输出任何解释。POI 务必包含 address 与一句话 intro；给出每日 timeline。'};
   const user={role:'user',content:buildUserPrompt()};
 
   try{
@@ -85,7 +85,7 @@ function buildUserPrompt(){
 - 人均预算: ${state.budget||'未指定'}
 - 其他要求: ${state.notes||'无'}
 
-请返回一次完整行程（概览 + 每日）。请尽量补充 POI 的地址/官网/门票/建议停留时长/小贴士。`;
+请返回一次完整行程（概览 + 每日）。务必包含每日 timeline；每个 POI 要有 address + 一句话 intro，可选 url/门票/时长/贴士。`;
 }
 
 function renderWidgets(plan){
@@ -103,7 +103,9 @@ function renderWidgets(plan){
 
   (plan.days||[]).forEach(d=>{
     const card=document.createElement('div'); card.className='day';
-    const tl = (d.timeline && d.timeline.length) ? `<div style="margin:6px 0"><b>时间建议：</b>${d.timeline.map(esc).join(' · ')}</div>` : '';
+    const tl = (d.timeline && d.timeline.length)
+      ? `<div style="margin:6px 0"><b>整体时间安排：</b><ul>${d.timeline.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`
+      : '';
     const dining = d.dining ? `<div style="margin:6px 0"><b>就餐建议：</b>${d.dining.lunch?('午餐：'+esc(d.dining.lunch))+'；':''}${d.dining.dinner?('晚餐：'+esc(d.dining.dinner)):''}</div>` : '';
     card.innerHTML=`<h3>${esc(d.title||'Day')}</h3>
       ${tl}
@@ -126,12 +128,17 @@ function pois(p){
       const name=esc(x.name||'');
       const type=esc(x.type||'');
       const addr=esc(x.address||'');
+      const intro=x.intro?`<div style="margin:2px 0">${esc(x.intro)}</div>`:'';
       const url=x.url?`<a href="${safeUrl(x.url)}" target="_blank" rel="noopener noreferrer">官网</a>`:'';
       const maps=`<a href="${mapsLink(x.name,x.address)}" target="_blank" rel="noopener noreferrer">地图</a>`;
       const ticket=x.ticket?` · 门票：${esc(x.ticket)}`:'';
       const stay=x.time_suggest?` · 停留：${esc(x.time_suggest)}`:'';
       const tips=x.tips?`<div style="color:#475569;margin-top:2px">小贴士：${esc(x.tips)}</div>`:'';
-      return `<li><div><b>${name}</b>（${type}） · ${addr} · ${maps}${url?` · ${url}`:''}${ticket}${stay}</div>${tips}</li>`;
+      return `<li>
+        <div><b>${name}</b>（${type}） · ${addr} · ${maps}${url?` · ${url}`:''}${ticket}${stay}</div>
+        ${intro}
+        ${tips}
+      </li>`;
     }).join('')
   }</ul></div>`;
 }
@@ -142,6 +149,7 @@ function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>'
 function safeUrl(u){ try{ const url=new URL(u); return url.href; }catch{ return '#'; } }
 function mapsLink(name,address){
   const q = encodeURIComponent([name||'', address||''].filter(Boolean).join(' '));
+  // 即使没有 address，也会用名称生成可用的搜索链接
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
@@ -161,15 +169,16 @@ function exportHTML(plan){
   o.innerHTML='<h3>行程概览</h3>' + '<div class="pill">总计：'+fr(cur,b.trip_total)+'</div>' + '<div class="pill">住宿/晚：'+fr(cur,b.accommodation_per_night)+'</div>' + '<div class="pill">餐饮/日：'+fr(cur,b.food_per_day)+'</div>' + '<div class="pill">交通总计：'+fr(cur,b.transport_total)+'</div>' + '<div class="pill">活动总计：'+fr(cur,b.activities_total)+'</div>' + '<div style="margin-top:8px">'+h(ov.summary||'')+'</div>'; it.appendChild(o);
   (plan.days||[]).forEach(function(d){
     var c=document.createElement('div'); c.className='day';
-    var tl=d.timeline&&d.timeline.length?('<div style="margin:6px 0"><b>时间建议：</b>'+d.timeline.map(h).join(' · ')+'</div>'):'';
+    var tl=d.timeline&&d.timeline.length?('<div style="margin:6px 0"><b>整体时间安排：</b><ul>'+d.timeline.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'';
     var dining=d.dining?('<div style="margin:6px 0"><b>就餐建议：</b>'+(d.dining.lunch?('午餐：'+h(d.dining.lunch))+'；':'')+(d.dining.dinner?('晚餐：'+h(d.dining.dinner)):'')+'</div>'):'';
     var pois=(d.pois||[]).map(function(x){
       var url = x.url ? '<a href=\"'+x.url+'\" target=\"_blank\" rel=\"noopener noreferrer\">官网</a>' : '';
       var maps = '<a href=\"'+mlink(x.name,x.address)+'\" target=\"_blank\" rel=\"noopener noreferrer\">地图</a>';
       var ticket = x.ticket ? ' · 门票：'+h(x.ticket) : '';
       var stay = x.time_suggest ? ' · 停留：'+h(x.time_suggest) : '';
+      var intro = x.intro ? '<div style=\"margin:2px 0\">'+h(x.intro)+'</div>' : '';
       var tips = x.tips ? '<div style=\"color:#475569;margin-top:2px\">小贴士：'+h(x.tips)+'</div>' : '';
-      return '<li><div><b>'+h(x.name||'')+'</b>（'+h(x.type||'')+'） · '+h(x.address||'')+' · '+maps+(url?(' · '+url):'')+ticket+stay+'</div>'+tips+'</li>';
+      return '<li><div><b>'+h(x.name||'')+'</b>（'+h(x.type||'')+'） · '+h(x.address||'')+' · '+maps+(url?(' · '+url):'')+ticket+stay+'</div>'+intro+tips+'</li>';
     }).join('');
     c.innerHTML='<h3>'+h(d.title||'Day')+'</h3>'+tl
       +(d.morning&&d.morning.length?('<div><b>上午</b><ul>'+d.morning.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'')
