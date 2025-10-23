@@ -35,7 +35,7 @@ async function startGeneration(){
   $('status').textContent='正在生成…'; $('progBox').style.display='block'; $('outCard').style.display='block'; $('pretty').innerHTML=''; $('raw').textContent='';
   ['saveBtn','copyBtn','dlJsonBtn','dlHtmlBtn'].forEach(id=>$(id).disabled=true);
 
-  const sys={role:'system',content:'你是专业旅行规划师。严格返回函数参数 JSON，不要输出任何解释。'};
+  const sys={role:'system',content:'你是专业旅行规划师。严格返回函数参数 JSON，不要输出任何解释。尽量补充 POI 的 address 与 url、门票与时长建议。'};
   const user={role:'user',content:buildUserPrompt()};
 
   try{
@@ -85,7 +85,7 @@ function buildUserPrompt(){
 - 人均预算: ${state.budget||'未指定'}
 - 其他要求: ${state.notes||'无'}
 
-请返回一次完整行程（概览 + 每日）。`;
+请返回一次完整行程（概览 + 每日）。请尽量补充 POI 的地址/官网/门票/建议停留时长/小贴士。`;
 }
 
 function renderWidgets(plan){
@@ -100,21 +100,90 @@ function renderWidgets(plan){
     <div class="pill">活动总计：${fmtRange(cur,b.activities_total)}</div>
     <div style="margin-top:8px">${esc(ov.summary||'')}</div>`;
   pretty.appendChild(ovCard);
+
   (plan.days||[]).forEach(d=>{
     const card=document.createElement('div'); card.className='day';
+    const tl = (d.timeline && d.timeline.length) ? `<div style="margin:6px 0"><b>时间建议：</b>${d.timeline.map(esc).join(' · ')}</div>` : '';
+    const dining = d.dining ? `<div style="margin:6px 0"><b>就餐建议：</b>${d.dining.lunch?('午餐：'+esc(d.dining.lunch))+'；':''}${d.dining.dinner?('晚餐：'+esc(d.dining.dinner)):''}</div>` : '';
     card.innerHTML=`<h3>${esc(d.title||'Day')}</h3>
+      ${tl}
       ${block('上午',d.morning)} ${block('下午',d.afternoon)} ${block('晚上',d.evening)}
       <div class="pill">交通：${esc(d.transport||'')}</div>
       <div class="pill">当日预算：${fmtRange((d.budget||{}).currency,d.budget)}</div>
-      ${pois(d.pois)} ${notes(d.notes)}`;
+      ${dining}
+      ${pois(d.pois)}
+      ${notes(d.notes)}`;
     pretty.appendChild(card);
   });
 }
+
 function block(t,arr){ if(!arr||!arr.length) return ''; return `<div><b>${t}</b><ul>${arr.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`; }
-function pois(p){ if(!p||!p.length) return ''; return `<div><b>POI</b><ul>${p.map(x=>'<li>'+esc(x.name||'')+'（'+esc(x.type||'')+'） · '+esc(x.address||'')+'</li>').join('')}</ul></div>`; }
+
+function pois(p){
+  if(!p||!p.length) return '';
+  return `<div><b>POI</b><ul>${
+    p.map(x=>{
+      const name=esc(x.name||'');
+      const type=esc(x.type||'');
+      const addr=esc(x.address||'');
+      const url=x.url?`<a href="${safeUrl(x.url)}" target="_blank" rel="noopener noreferrer">官网</a>`:'';
+      const maps=`<a href="${mapsLink(x.name,x.address)}" target="_blank" rel="noopener noreferrer">地图</a>`;
+      const ticket=x.ticket?` · 门票：${esc(x.ticket)}`:'';
+      const stay=x.time_suggest?` · 停留：${esc(x.time_suggest)}`:'';
+      const tips=x.tips?`<div style="color:#475569;margin-top:2px">小贴士：${esc(x.tips)}</div>`:'';
+      return `<li><div><b>${name}</b>（${type}） · ${addr} · ${maps}${url?` · ${url}`:''}${ticket}${stay}</div>${tips}</li>`;
+    }).join('')
+  }</ul></div>`;
+}
+
 function notes(n){ if(!n||!n.length) return ''; return `<div><b>备注</b><ul>${n.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></div>`; }
 function fmtRange(cur,seg){ if(!seg) return '-'; const {min,max}=seg; if(min==null&&max==null) return '-'; if(min==null) return `${cur||''} ~${max}`; if(max==null) return `${cur||''} ${min}~`; return `${cur||''} ${min}–${max}`; }
 function esc(s){ return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function safeUrl(u){ try{ const url=new URL(u); return url.href; }catch{ return '#'; } }
+function mapsLink(name,address){
+  const q = encodeURIComponent([name||'', address||''].filter(Boolean).join(' '));
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+
 function download(type,name,content){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url); }
-function exportHTML(plan){ const head='<!doctype html><html><meta charset="utf-8"><title>Go Travel</title><style>body{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto;background:#f8fafc;color:#0f172a}.itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px}@media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }.day{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)}.day h3{margin:0 0 8px}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1;font-size:12px;margin-right:6px}</style><body><div class="itinerary" id="it"></div><script>'; const tail='</script></body></html>'; const js=`var plan=${'${JSON.stringify(plan)}'};function h(t){return t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}function r(title,arr){if(!arr||!arr.length)return '';return '<div><b>'+title+'</b><ul>'+arr.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>';}function fr(cur,seg){if(!seg)return '-';var mn=seg.min,mx=seg.max;if(mn==null&&mx==null)return '-';if(mn==null)return (cur||'')+' ~'+mx; if(mx==null)return (cur||'')+' '+mn+'~'; return (cur||'')+' '+mn+'–'+mx;}var it=document.getElementById('it');var ov=plan.overview||{}, b=ov.budget||{}, cur=b.currency||'';var o=document.createElement('div'); o.className='day'; o.innerHTML='<h3>行程概览</h3>' + '<div class="pill">总计：'+fr(cur,b.trip_total)+'</div>' + '<div class="pill">住宿/晚：'+fr(cur,b.accommodation_per_night)+'</div>' + '<div class="pill">餐饮/日：'+fr(cur,b.food_per_day)+'</div>' + '<div class="pill">交通总计：'+fr(cur,b.transport_total)+'</div>' + '<div class="pill">活动总计：'+fr(cur,b.activities_total)+'</div>' + '<div style="margin-top:8px">'+h(ov.summary||'')+'</div>'; it.appendChild(o); (plan.days||[]).forEach(function(d){ var c=document.createElement('div'); c.className='day'; c.innerHTML='<h3>'+h(d.title||'Day')+'</h3>'+r('上午',d.morning)+r('下午',d.afternoon)+r('晚上',d.evening) + '<div class="pill">交通：'+h(d.transport||'')+'</div>' + '<div class="pill">当日预算：'+fr((d.budget||{}).currency,d.budget)+'</div>' + (d.pois&&d.pois.length?('<div><b>POI</b><ul>'+d.pois.map(p=>'<li>'+h(p.name||'')+'（'+h(p.type||'')+'） · '+h(p.address||'')+'</li>').join('')+'</ul></div>'):'') + (d.notes&&d.notes.length?('<div><b>备注</b><ul>'+d.notes.map(x=>'<li>'+h(x)+'</li>').join('')+'</ul></div>'):''); it.appendChild(c); });`; return head+js+tail; }
+
+function exportHTML(plan){
+  const head='<!doctype html><html><meta charset="utf-8"><title>Go Travel</title><style>body{font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto;background:#f8fafc;color:#0f172a}.itinerary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px}@media (max-width:860px){ .itinerary{grid-template-columns:1fr;} }.day{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.04)}.day h3{margin:0 0 8px}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#ecfeff;border:1px solid #a5f3fc;color:#0369a1;font-size:12px;margin-right:6px}a{color:#0ea5e9;text-decoration:none}a:hover{text-decoration:underline}</style><body><div class="itinerary" id="it"></div><script>';
+  const tail='</script></body></html>';
+  const js = `
+  var plan=${JSON.stringify(plan).replace(/</g,'\\u003c')};
+  function h(t){return (t||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+  function fr(cur,seg){if(!seg)return '-';var mn=seg.min,mx=seg.max;if(mn==null&&mx==null)return '-';if(mn==null)return (cur||'')+' ~'+mx; if(mx==null)return (cur||'')+' '+mn+'~'; return (cur||'')+' '+mn+'–'+mx;}
+  function mlink(n,a){var q=encodeURIComponent([n||'',a||''].filter(Boolean).join(' '));return 'https://www.google.com/maps/search/?api=1&query='+q;}
+  var it=document.getElementById('it');
+  var ov=plan.overview||{}, b=ov.budget||{}, cur=b.currency||'';
+  var o=document.createElement('div'); o.className='day';
+  o.innerHTML='<h3>行程概览</h3>' + '<div class="pill">总计：'+fr(cur,b.trip_total)+'</div>' + '<div class="pill">住宿/晚：'+fr(cur,b.accommodation_per_night)+'</div>' + '<div class="pill">餐饮/日：'+fr(cur,b.food_per_day)+'</div>' + '<div class="pill">交通总计：'+fr(cur,b.transport_total)+'</div>' + '<div class="pill">活动总计：'+fr(cur,b.activities_total)+'</div>' + '<div style="margin-top:8px">'+h(ov.summary||'')+'</div>'; it.appendChild(o);
+  (plan.days||[]).forEach(function(d){
+    var c=document.createElement('div'); c.className='day';
+    var tl=d.timeline&&d.timeline.length?('<div style="margin:6px 0"><b>时间建议：</b>'+d.timeline.map(h).join(' · ')+'</div>'):'';
+    var dining=d.dining?('<div style="margin:6px 0"><b>就餐建议：</b>'+(d.dining.lunch?('午餐：'+h(d.dining.lunch))+'；':'')+(d.dining.dinner?('晚餐：'+h(d.dining.dinner)):'')+'</div>'):'';
+    var pois=(d.pois||[]).map(function(x){
+      var url = x.url ? '<a href=\"'+x.url+'\" target=\"_blank\" rel=\"noopener noreferrer\">官网</a>' : '';
+      var maps = '<a href=\"'+mlink(x.name,x.address)+'\" target=\"_blank\" rel=\"noopener noreferrer\">地图</a>';
+      var ticket = x.ticket ? ' · 门票：'+h(x.ticket) : '';
+      var stay = x.time_suggest ? ' · 停留：'+h(x.time_suggest) : '';
+      var tips = x.tips ? '<div style=\"color:#475569;margin-top:2px\">小贴士：'+h(x.tips)+'</div>' : '';
+      return '<li><div><b>'+h(x.name||'')+'</b>（'+h(x.type||'')+'） · '+h(x.address||'')+' · '+maps+(url?(' · '+url):'')+ticket+stay+'</div>'+tips+'</li>';
+    }).join('');
+    c.innerHTML='<h3>'+h(d.title||'Day')+'</h3>'+tl
+      +(d.morning&&d.morning.length?('<div><b>上午</b><ul>'+d.morning.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'')
+      +(d.afternoon&&d.afternoon.length?('<div><b>下午</b><ul>'+d.afternoon.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'')
+      +(d.evening&&d.evening.length?('<div><b>晚上</b><ul>'+d.evening.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'')
+      +'<div class=\"pill\">交通：'+h(d.transport||'')+'</div>'
+      +'<div class=\"pill\">当日预算：'+fr((d.budget||{}).currency,d.budget)+'</div>'
+      +dining
+      + (pois?('<div><b>POI</b><ul>'+pois+'</ul></div>'):'')
+      + (d.notes&&d.notes.length?('<div><b>备注</b><ul>'+d.notes.map(h).map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>'):'');
+    it.appendChild(c);
+  });
+  `;
+  return head+js+tail;
+}
+
 window.addEventListener('DOMContentLoaded', initUI);
