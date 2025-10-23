@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0ea5e9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="description" content="Go Travel · 智能旅行计划助手——多步引导、流式生成、Widget 卡片渲染、PWA 可安装。" />
+  <meta name="description" content="Go Travel · 智能旅行计划助手——多步引导、稳定生成、Widget 卡片渲染、PWA 可安装。" />
   <title>Go Travel · 带你说走就走</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
@@ -55,7 +55,7 @@
   <div class="wrap">
     <div class="hero">
       <div class="brand"><span class="logo"></span><div class="title">Go Travel · 带你说走就走</div></div>
-      <span class="tag">多步引导 • 流式生成 • Widget 卡片</span>
+      <span class="tag">多步引导 • 稳定生成 • Widget 卡片</span>
     </div>
     <div class="stepper">
       <span id="s1" class="chip active">1. 是否已有目的地</span>
@@ -100,7 +100,7 @@
       </div>
       <div class="actions"><button class="btn secondary" id="back4">上一步</button><button class="btn" id="startGen">✨ 生成行程</button></div>
       <div class="muted" id="status" style="margin-top:6px"></div>
-      <div class="progress" id="progBox" style="display:none"><b>正在生成</b>，会边输出边显示…</div>
+      <div class="progress" id="progBox" style="display:none"><b>正在生成</b>，请稍候…</div>
     </div>
     <div class="card" id="outCard" style="display:none">
       <div class="toolbar">
@@ -115,7 +115,13 @@
   </div>
   <button id="installBtn" title="安装到桌面">安装</button>
   <div class="modal" id="guide"><div class="dialog"><h3>如何安装为 App</h3><div id="guideText"></div></div></div>
-  <script src="/app.js?v=5"></script>
-  <script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js?v=5').catch(console.error));}</script>
+
+  <!-- 去掉 ?v 查询参数，避免与 SW 缓存名单不一致 -->
+  <script src="/app.js"></script>
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(console.error));
+    }
+  </script>
 </body>
 </html>
