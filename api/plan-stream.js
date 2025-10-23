@@ -13,14 +13,18 @@ export default async function handler(req) {
     const body = await req.json();
     const { model, temperature = 0.4, messages = [] } = body || {};
 
+    // 参考并借用你提供的方案：严格 schema & 前端生成地图锚文本的做法（见 app.py）:contentReference[oaicite:1]{index=1}
     const sysExtra = {
       role: "system",
       content: [
-        "你是资深旅行规划师。务必生成**细致可执行**的行程：",
-        "1) 概览里给出简明摘要与预算区间（货币符号）。",
-        "2) 每日安排包含：交通方式、时间建议、就餐建议（午/晚餐）、以及至少3个 POI。",
-        "3) 每个 POI 必须尽量包含：name, type, address（含邮编或区域信息）, url（官网或权威页面，如没有可省略）, ticket（门票/费用，若免费写“免费”或“0”）, time_suggest（建议停留时长，如“1–1.5h”）, tips（排队/拍照/闭馆日等建议）。",
-        "4) 所有输出仅通过函数参数返回，禁止额外解释文本。"
+        "你是资深旅行规划师，输出必须细致、可执行，并严格通过函数参数 JSON 返回（禁止额外解释）。",
+        "要求：",
+        "1) 概览：简明摘要 + 预算区间（含货币符号）。",
+        "2) 每日：提供 `timeline`（整体时间安排，2–6 条，形如“08:30–10:00 伦敦塔 | 步行 12 分钟到下一站”）。",
+        "3) 每日至少 3 个 POI；每个 POI 必须包含：name, type, address, intro（一句话介绍）。有官网时填 `url`。",
+        "4) 细节：为 POI 给 `ticket`（若免费写“免费”/“0”）、`time_suggest`（如“1–1.5h”）、`tips`（预约/闭馆/避坑）。",
+        "5) 地址请尽量含城市/区域/邮编或地标，便于地图检索；不要返回地图短链，地图链接交由前端基于 name+address 生成。",
+        "6) 交通/就餐建议合理，避免时间冲突；未知信息用“待确认”。"
       ].join("\n")
     };
 
@@ -57,31 +61,33 @@ export default async function handler(req) {
                 type: "object",
                 properties: {
                   title: { type: "string" },
+                  timeline: { type: "array", items: { type: "string" } }, // 整体时间安排（新增/强化）
                   morning: { type: "array", items: { type: "string" } },
                   afternoon: { type: "array", items: { type: "string" } },
                   evening: { type: "array", items: { type: "string" } },
                   transport: { type: "string" },
-                  dining: { type: "object", properties: {
-                    lunch: { type: "string" }, dinner: { type: "string" }
-                  }},
-                  timeline: { type: "array", items: { type: "string" } },
+                  dining: { type: "object", properties: { lunch: { type: "string" }, dinner: { type: "string" } } },
                   budget: { type: "object", properties: { currency:{type:"string"}, min:{type:"number"}, max:{type:"number"} } },
                   notes: { type: "array", items: { type: "string" } },
-                  pois: { type: "array", items: {
-                    type: "object",
-                    properties: {
-                      name:{type:"string"},
-                      type:{type:"string"},
-                      address:{type:"string"},
-                      url:{type:"string"},
-                      ticket:{type:"string"},
-                      time_suggest:{type:"string"},
-                      tips:{type:"string"}
-                    },
-                    required:["name","type","address"]
-                  } }
+                  pois: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name:{type:"string"},
+                        type:{type:"string"},
+                        address:{type:"string"},
+                        intro:{type:"string"},        // 一句话介绍（新增，必填）
+                        url:{type:"string"},
+                        ticket:{type:"string"},
+                        time_suggest:{type:"string"},
+                        tips:{type:"string"}
+                      },
+                      required:["name","type","address","intro"]
+                    }
+                  }
                 },
-                required: ["title","pois"]
+                required: ["title","timeline","pois"]
               }
             },
             links: { type: "object", properties: { official_sites: { type: "array", items: { type: "string" } } } }
@@ -91,7 +97,6 @@ export default async function handler(req) {
       }
     }];
 
-    // 把额外系统约束插在最前
     const msgs = [sysExtra, ...messages];
 
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
