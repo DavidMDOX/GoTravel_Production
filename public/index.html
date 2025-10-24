@@ -50,6 +50,59 @@
     .dialog{background:#fff;border-radius:14px;max-width:520px;width:90%;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
     .dialog h3{margin:0 0 8px}
   </style>
+  <style>
+/* —— Mobile 尺寸微调：只影响小屏 —— */
+@media (max-width: 430px){
+
+  /* 缩小基础字号 & 控件高度（不影响桌面） */
+  :root{
+    --fz-base: clamp(13px, 3.1vw, 15px);
+    --fz-sm:   clamp(11.5px, calc(var(--fz-base)*0.86), 13.5px);
+    --fz-xs:   clamp(10.5px, calc(var(--fz-base)*0.76), 12px);
+    --ctl-h: 38px; /* 原先更高，这里压到 38px，仍>=可点尺寸 */
+  }
+
+  /* 顶部小标签更紧凑 */
+  .tag{
+    font-size: var(--fz-xs);
+    padding: 3px 8px;
+  }
+
+  /* 步骤条的圆角标签（绿色/蓝色）更小更紧凑 */
+  .chip{
+    font-size: var(--fz-xs);
+    padding: 5px 8px;
+    border-radius: 999px;
+  }
+
+  /* 偏好选项“方框”更小：字号/内边距/最小高度/圆角 */
+  .chip-btn{
+    font-size: var(--fz-sm);
+    padding: 8px 10px;
+    min-height: 36px;
+    border-radius: 10px;
+  }
+
+  /* 输入框/下拉框高度与内边距同步缩小 */
+  input, select, textarea{
+    height: 38px;
+    padding: 10px 12px;
+    font-size: var(--fz-md);
+  }
+  textarea{ min-height: 84px; height: auto; }
+
+  /* 次要小元素（说明文字/药丸标签）再小一档 */
+  label, .pill{
+    font-size: var(--fz-xs);
+  }
+
+  /* 卡片标题略小，保持层级清晰 */
+  .day h3{
+    font-size: var(--fz-lg);
+  }
+}
+</style>
+
 </head>
 <body>
   <div class="wrap">
