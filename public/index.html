@@ -150,7 +150,15 @@
   }
 }
 </style>
-
+<style>
+/* 取消偏好设置里加粗（含选中态） */
+@media (max-width: 430px){
+  #step3 .chip-btn,
+  #step3 .chip-btn.active{
+    font-weight: 400; /* normal */
+  }
+}
+</style>
 </head>
 <body>
   <div class="wrap">
