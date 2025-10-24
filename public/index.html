@@ -103,6 +103,54 @@
 }
 </style>
 
+  <style>
+/* 只收紧“偏好设置”这张卡与里面的方框 */
+@media (max-width: 430px){
+  /* 外层卡片整体更紧凑 */
+  #step3.card{
+    padding: 12px 12px;
+    border-radius: 12px;
+  }
+
+  /* 网格更密一些 */
+  #step3 .chips{
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px; /* 原来更大，这里缩小间距 */
+  }
+
+  /* 每个偏好“方框”：减少内边距/高度，增加字号与字重，减少空感 */
+  #step3 .chip-btn{
+    padding: 7px 8px;          /* ↓ 内边距更小 */
+    min-height: 34px;          /* ↓ 高度更低 */
+    border-radius: 10px;
+    font-size: var(--fz-md);   /* ↑ 比之前的 var(--fz-sm) 更大 */
+    font-weight: 600;          /* ↑ 字更实一些 */
+    line-height: 1.15;         /* ↓ 行高更紧凑 */
+    letter-spacing: 0.1px;
+  }
+
+  /* 已选中的视觉也跟着收紧 */
+  #step3 .chip-btn.active{
+    box-shadow: 0 1px 0 rgba(0,0,0,.04) inset;
+  }
+
+  /* 这张卡里的说明字号稍微小一点，保持层级 */
+  #step3 label{
+    font-size: var(--fz-xs);
+  }
+}
+
+/* 超小屏（≤360px）再收一档 */
+@media (max-width: 360px){
+  #step3 .chips{ gap: 5px; }
+  #step3 .chip-btn{
+    padding: 6px 8px;
+    min-height: 32px;
+    font-size: calc(var(--fz-md) * 0.95);
+  }
+}
+</style>
+
 </head>
 <body>
   <div class="wrap">
